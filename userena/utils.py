@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.utils.hashcompat import sha_constructor
-from django.contrib.auth.models import SiteProfileNotAvailable
+from django.contrib.auth.models import SiteProfileNotAvailable, User
+from django.shortcuts import get_object_or_404
 from django.db.models import get_model
 
 from userena import settings as userena_settings
@@ -52,6 +53,41 @@ def get_gravatar(email, size=80, default='identicon'):
     gravatar_url += urllib.urlencode({'s': str(size),
                                       'd': default})
     return gravatar_url
+
+def get_userid(user):
+    if userena_settings.USERENA_URL_USE_USERNAME:
+        return user.username
+    else:
+        return user.id
+
+def convert_userid_username(func):
+    """ Gets rid of the userid parameter in favor of the username.
+
+    :param func:
+        The function to be modified by this decorator.
+
+    :return: The new function
+
+    """
+    def _convert_userid_username(*args, **kwargs):
+        if 'userid' not in kwargs:
+            raise TypeError("missing keyword argument 'userid'")
+        if 'username' in kwargs:
+            raise TypeError("unexpected keyword argument 'username'")
+
+        if userena_settings.USERENA_URL_USE_USERNAME:
+            kwargs['username'] = kwargs['userid']
+        else:
+            users = User.objects.filter(id__iexact=int(userid))
+            if len(users) == 0:
+                kwargs['username'] = ''
+            else:
+                kwargs['username'] = users[0].username
+        del kwargs['userid']
+        return func(*args, **kwargs)
+
+    return _convert_userid_username
+
 
 def signin_redirect(redirect=None, user=None):
     """

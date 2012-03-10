@@ -23,10 +23,10 @@ class PrivacyTests(ProfileTestCase):
                   'password': 'blowfish'}
 
     detail_profile_url = reverse('userena_profile_detail',
-                                 kwargs={'username': 'john'})
+                                 kwargs={'userid': 'john'})
 
     edit_profile_url = reverse('userena_profile_edit',
-                                kwargs={'username': 'john'})
+                                kwargs={'userid': 'john'})
 
     def _test_status_codes(self, url, users_status):
         """

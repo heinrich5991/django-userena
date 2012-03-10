@@ -23,10 +23,10 @@ class UserenaViewsTests(ProfileTestCase):
                                'tos': 'on'})
         user = User.objects.get(email='alice@example.com')
         response = self.client.get(reverse('userena_activate',
-                                           kwargs={'username': user.username,
+                                           kwargs={'userid': user.username,
                                                    'activation_key': user.userena_signup.activation_key}))
         self.assertRedirects(response,
-                             reverse('userena_profile_detail', kwargs={'username': user.username}))
+                             reverse('userena_profile_detail', kwargs={'userid': user.username}))
 
         user = User.objects.get(email='alice@example.com')
         self.failUnless(user.is_active)
@@ -37,7 +37,7 @@ class UserenaViewsTests(ProfileTestCase):
 
         """
         response = self.client.get(reverse('userena_activate',
-                                           kwargs={'username': 'john',
+                                           kwargs={'userid': 'john',
                                                    'activation_key': 'fake'}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response,
@@ -50,11 +50,11 @@ class UserenaViewsTests(ProfileTestCase):
         user.userena_signup.change_email('johnie@example.com')
 
         response = self.client.get(reverse('userena_email_confirm',
-                                           kwargs={'username': user.username,
+                                           kwargs={'userid': user.username,
                                                    'confirmation_key': user.userena_signup.email_confirmation_key}))
 
         self.assertRedirects(response,
-                             reverse('userena_email_confirm_complete', kwargs={'username': user.username}))
+                             reverse('userena_email_confirm_complete', kwargs={'userid': user.username}))
 
     def test_invalid_confirmation(self):
         """
@@ -62,7 +62,7 @@ class UserenaViewsTests(ProfileTestCase):
 
         """
         response = self.client.get(reverse('userena_email_confirm',
-                                           kwargs={'username': 'john',
+                                           kwargs={'userid': 'john',
                                                    'confirmation_key': 'WRONG'}))
         self.assertTemplateUsed(response,
                                 'userena/email_confirm_fail.html')
@@ -70,7 +70,7 @@ class UserenaViewsTests(ProfileTestCase):
     def test_disabled_view(self):
         """ A ``GET`` to the ``disabled`` view """
         response = self.client.get(reverse('userena_disabled',
-                                           kwargs={'username': 'john'}))
+                                           kwargs={'userid': 'john'}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response,
                                 'userena/disabled.html')
@@ -127,7 +127,7 @@ class UserenaViewsTests(ProfileTestCase):
 
         # Check for redirect.
         self.assertRedirects(response,
-                             reverse('userena_signup_complete', kwargs={'username': 'alice'}))
+                             reverse('userena_signup_complete', kwargs={'userid': 'alice'}))
 
         # Check for new user.
         self.assertEqual(User.objects.filter(email__iexact='alice@example.com').count(), 1)
@@ -180,7 +180,7 @@ class UserenaViewsTests(ProfileTestCase):
 
         self.assertRedirects(response,
                              reverse('userena_disabled',
-                                     kwargs={'username': user.username}))
+                                     kwargs={'userid': user.username}))
 
     def test_signin_view_success(self):
         """
@@ -194,7 +194,7 @@ class UserenaViewsTests(ProfileTestCase):
                                           'password': 'blowfish'})
 
         self.assertRedirects(response, reverse('userena_profile_detail',
-                                               kwargs={'username': 'john'}))
+                                               kwargs={'userid': 'john'}))
 
         # Redirect to supplied ``next`` value.
         response = self.client.post(reverse('userena_signin'),
@@ -213,7 +213,7 @@ class UserenaViewsTests(ProfileTestCase):
     def test_change_email_view(self):
         """ A ``GET`` to the change e-mail view. """
         response = self.client.get(reverse('userena_email_change',
-                                           kwargs={'username': 'john'}))
+                                           kwargs={'userid': 'john'}))
 
         # Anonymous user should not be able to view the profile page
         self.assertEqual(response.status_code, 403)
@@ -221,7 +221,7 @@ class UserenaViewsTests(ProfileTestCase):
         # Login
         client = self.client.login(username='john', password='blowfish')
         response = self.client.get(reverse('userena_email_change',
-                                           kwargs={'username': 'john'}))
+                                           kwargs={'userid': 'john'}))
 
         self.assertEqual(response.status_code, 200)
 
@@ -236,18 +236,18 @@ class UserenaViewsTests(ProfileTestCase):
         """ A ``POST`` with a valid e-mail address """
         self.client.login(username='john', password='blowfish')
         response = self.client.post(reverse('userena_email_change',
-                                            kwargs={'username': 'john'}),
+                                            kwargs={'userid': 'john'}),
                                     data={'email': 'john_new@example.com'})
 
         self.assertRedirects(response,
                              reverse('userena_email_change_complete',
-                                     kwargs={'username': 'john'}))
+                                     kwargs={'userid': 'john'}))
 
     def test_change_password_view(self):
         """ A ``GET`` to the change password view """
         self.client.login(username='john', password='blowfish')
         response = self.client.get(reverse('userena_password_change',
-                                           kwargs={'username': 'john'}))
+                                           kwargs={'userid': 'john'}))
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'userena/password_form.html')
@@ -260,13 +260,13 @@ class UserenaViewsTests(ProfileTestCase):
 
         new_password = 'suckfish'
         response = self.client.post(reverse('userena_password_change',
-                                            kwargs={'username': 'john'}),
+                                            kwargs={'userid': 'john'}),
                                     data={'new_password1': new_password,
                                           'new_password2': 'suckfish',
                                           'old_password': 'blowfish'})
 
         self.assertRedirects(response, reverse('userena_password_change_complete',
-                                               kwargs={'username': 'john'}))
+                                               kwargs={'userid': 'john'}))
 
         # Check that the new password is set.
         john = User.objects.get(username='john')
@@ -275,7 +275,7 @@ class UserenaViewsTests(ProfileTestCase):
     def test_profile_detail_view(self):
         """ A ``GET`` to the detailed view of a user """
         response = self.client.get(reverse('userena_profile_detail',
-                                           kwargs={'username': 'john'}))
+                                           kwargs={'userid': 'john'}))
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'userena/profile_detail.html')
@@ -284,7 +284,7 @@ class UserenaViewsTests(ProfileTestCase):
         """ A ``GET`` to the edit view of a users account """
         self.client.login(username='john', password='blowfish')
         response = self.client.get(reverse('userena_profile_edit',
-                                           kwargs={'username': 'john'}))
+                                           kwargs={'userid': 'john'}))
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'userena/profile_form.html')
@@ -296,14 +296,14 @@ class UserenaViewsTests(ProfileTestCase):
         self.client.login(username='john', password='blowfish')
         new_about_me = 'I hate it when people use my name for testing.'
         response = self.client.post(reverse('userena_profile_edit',
-                                            kwargs={'username': 'john'}),
+                                            kwargs={'userid': 'john'}),
                                     data={'about_me': new_about_me,
                                           'privacy': 'open',
                                           'language': 'en'})
 
         # A valid post should redirect to the detail page.
         self.assertRedirects(response, reverse('userena_profile_detail',
-                                               kwargs={'username': 'john'}))
+                                               kwargs={'userid': 'john'}))
 
         # Users hould be changed now.
         profile = User.objects.get(username='john').get_profile()
@@ -323,3 +323,4 @@ class UserenaViewsTests(ProfileTestCase):
         userena_settings.USERENA_DISABLE_PROFILE_LIST = True
         response = self.client.get(reverse('userena_profile_list'))
         self.assertEqual(response.status_code, 404)
+

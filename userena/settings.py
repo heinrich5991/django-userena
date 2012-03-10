@@ -87,6 +87,10 @@ USERENA_LANGUAGE_FIELD = getattr(settings,
                                  'USERENA_LANGUAGE_FIELD',
                                  'language')
 
+USERENA_URL_USE_USERNAME = getattr(settings,
+                                   'USERENA_URL_USE_USERNAME',
+                                   True)
+
 USERENA_WITHOUT_USERNAMES = getattr(settings,
                                     'USERENA_WITHOUT_USERNAMES',
                                     False)
