@@ -54,39 +54,48 @@ def get_gravatar(email, size=80, default='identicon'):
                                       'd': default})
     return gravatar_url
 
-def get_userid(user):
+def get_url_userid_key():
+    if userena_settings.USERENA_URL_USE_USERNAME:
+        return 'username'
+    else:
+        return 'userid'
+
+def get_url_userid(user):
     if userena_settings.USERENA_URL_USE_USERNAME:
         return user.username
     else:
         return user.id
 
-def convert_userid_username(func):
-    """ Gets rid of the userid parameter in favor of the username.
+def convert_userid_user_or_404(func):
+    """ Gets rid of the userid or username parameter in favor of the user.
 
     :param func:
-        The function to be modified by this decorator.
+        The function to be modified by this decorator. Incoming keyword
+        arguments can be either 'username' or 'userid', which is replaced
+        by the keyword argument 'user'. WARNING: The userid keyword argument
+        must be an integer.
 
     :return: The new function
 
     """
-    def _convert_userid_username(*args, **kwargs):
-        if 'userid' not in kwargs:
-            raise TypeError("missing keyword argument 'userid'")
-        if 'username' in kwargs:
-            raise TypeError("unexpected keyword argument 'username'")
+    def _convert_userid_user_or_404(*args, **kwargs):
+        if 'userid' in kwargs or 'username' in kwargs:
+            if 'userid' in kwargs and 'username' in kwargs:
+                raise TypeError("unexpected keyword arguments, both 'userid' and 'username'")
 
-        if userena_settings.USERENA_URL_USE_USERNAME:
-            kwargs['username'] = kwargs['userid']
-        else:
-            users = User.objects.filter(id__iexact=int(userid))
-            if len(users) == 0:
-                kwargs['username'] = ''
+            if 'user' in kwargs:
+                raise TypeError("unexpected keyword argument 'user'")
+
+            if 'userid' in kwargs:
+                kwargs['user'] = get_object_or_404(User, id=int(kwargs['userid']))
+                del kwargs['userid']
             else:
-                kwargs['username'] = users[0].username
-        del kwargs['userid']
+                kwargs['user'] = get_object_or_404(User, username=kwargs['username'])
+                del kwargs['username']
+
         return func(*args, **kwargs)
 
-    return _convert_userid_username
+    return _convert_userid_user_or_404
 
 
 def signin_redirect(redirect=None, user=None):
@@ -111,7 +120,7 @@ def signin_redirect(redirect=None, user=None):
     if redirect: return redirect
     elif user is not None:
         return userena_settings.USERENA_SIGNIN_REDIRECT_URL % \
-                {'username': user.username}
+                {'userid': get_url_userid(user)}
     else: return settings.LOGIN_REDIRECT_URL
 
 def generate_sha1(string, salt=None):

@@ -1,6 +1,6 @@
 from django.views.generic.simple import direct_to_template
 from django.core.urlresolvers import reverse
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import redirect
 from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
@@ -16,7 +16,7 @@ from userena.forms import (SignupForm, SignupFormOnlyEmail, AuthenticationForm,
 from userena.models import UserenaSignup
 from userena.decorators import secure_required
 from userena.backends import UserenaAuthenticationBackend
-from userena.utils import signin_redirect, get_profile_model, convert_userid_username, get_userid
+from userena.utils import signin_redirect, get_profile_model, convert_userid_user_or_404, get_url_userid, get_url_userid_key
 from userena import signals as userena_signals
 from userena import settings as userena_settings
 
@@ -76,7 +76,7 @@ def signup(request, signup_form=SignupForm,
 
             if success_url: redirect_to = success_url
             else: redirect_to = reverse('userena_signup_complete',
-                                        kwargs={'userid': get_userid(user)})
+                                        kwargs={get_url_userid_key() : get_url_userid(user)})
 
             # A new signed user should logout the old one.
             if request.user.is_authenticated():
@@ -89,9 +89,9 @@ def signup(request, signup_form=SignupForm,
                               template_name,
                               extra_context=extra_context)
 
-@convert_userid_username
+@convert_userid_user_or_404
 @secure_required
-def activate(request, username, activation_key,
+def activate(request, user, activation_key,
              template_name='userena/activate_fail.html',
              success_url=None, extra_context=None):
     """
@@ -103,8 +103,8 @@ def activate(request, username, activation_key,
     ``succes_url``.  If the SHA1 is not found, the user will be shown the
     ``template_name`` template displaying a fail message.
 
-    :param username:
-        String of the username that wants to be activated.
+    :param user:
+        The user that wants to be activated.
 
     :param activation_key:
         String of a SHA1 string of 40 characters long. A SHA1 is always 160bit
@@ -127,7 +127,7 @@ def activate(request, username, activation_key,
         context. Default to an empty dictionary.
 
     """
-    user = UserenaSignup.objects.activate_user(username, activation_key)
+    user = UserenaSignup.objects.activate_user(user.username, activation_key)
     if user:
         # Sign the user in.
         auth_user = authenticate(identification=user.email,
@@ -138,9 +138,9 @@ def activate(request, username, activation_key,
             messages.success(request, _('Your account has been activated and you have been signed in.'),
                              fail_silently=True)
 
-        if success_url: redirect_to = success_url % {'userid': get_userid(user) }
+        if success_url: redirect_to = success_url % {get_url_userid_key() : get_url_userid(user) }
         else: redirect_to = reverse('userena_profile_detail',
-                                    kwargs={'userid': get_userid(user)})
+                                    kwargs={get_url_userid_key() : get_url_userid(user)})
         return redirect(redirect_to)
     else:
         if not extra_context: extra_context = dict()
@@ -148,9 +148,9 @@ def activate(request, username, activation_key,
                                   template_name,
                                   extra_context=extra_context)
 
-@convert_userid_username
+@convert_userid_user_or_404
 @secure_required
-def email_confirm(request, username, confirmation_key,
+def email_confirm(request, user, confirmation_key,
                   template_name='userena/email_confirm_fail.html',
                   success_url=None, extra_context=None):
     """
@@ -162,8 +162,8 @@ def email_confirm(request, username, confirmation_key,
     returned the user will be represented with a fail message from
     ``template_name``.
 
-    :param username:
-        String of the username whose email address needs to be confirmed.
+    :param user:
+        The user whose email address needs to be confirmed.
 
     :param confirmation_key:
         String with a SHA1 representing the confirmation key used to verify a
@@ -184,11 +184,11 @@ def email_confirm(request, username, confirmation_key,
         ``template_name``.
 
     """
-    user = UserenaSignup.objects.confirm_email(username, confirmation_key)
+    user = UserenaSignup.objects.confirm_email(user.username, confirmation_key)
     if user:
         if success_url: redirect_to = success_url
         else: redirect_to = reverse('userena_email_confirm_complete',
-                                    kwargs={'userid': get_userid(user)})
+                                    kwargs={get_url_userid_key() : get_url_userid(user)})
         return redirect(redirect_to)
     else:
         if not extra_context: extra_context = dict()
@@ -196,8 +196,8 @@ def email_confirm(request, username, confirmation_key,
                                   template_name,
                                   extra_context=extra_context)
 
-@convert_userid_username
-def direct_to_user_template(request, username, template_name,
+@convert_userid_user_or_404
+def direct_to_user_template(request, user, template_name,
                             extra_context=None):
     """
     Simple wrapper for Django's :func:`direct_to_template` view.
@@ -207,8 +207,8 @@ def direct_to_user_template(request, username, template_name,
     the user that is found with ``username``. For ex. used after signup,
     activation and confirmation of a new e-mail.
 
-    :param username:
-        String defining the username of the user that made the action.
+    :param user:
+        The user that made the action.
 
     :param template_name:
         String defining the name of the template to use. Defaults to
@@ -227,8 +227,6 @@ def direct_to_user_template(request, username, template_name,
         The currently :class:`User` that is viewed.
 
     """
-    user = get_object_or_404(User, username__iexact=username)
-
     if not extra_context: extra_context = dict()
     extra_context['viewed_user'] = user
     extra_context['profile'] = user.get_profile()
@@ -307,7 +305,7 @@ def signin(request, auth_form=AuthenticationForm,
                 return redirect(redirect_to)
             else:
                 return redirect(reverse('userena_disabled',
-                                        kwargs={'userid': get_userid(user)}))
+                                        kwargs={get_url_userid_key() : get_url_userid(user)}))
 
     if not extra_context: extra_context = dict()
     extra_context.update({
@@ -320,17 +318,17 @@ def signin(request, auth_form=AuthenticationForm,
 
 
 
-@convert_userid_username
+@convert_userid_user_or_404
 @secure_required
-@permission_required_or_403('change_user', (User, 'username', 'username'))
-def email_change(request, username, email_form=ChangeEmailForm,
+@permission_required_or_403('change_user')
+def email_change(request, user, email_form=ChangeEmailForm,
                  template_name='userena/email_form.html', success_url=None,
                  extra_context=None):
     """
     Change email address
 
-    :param username:
-        String of the username which specifies the current account.
+    :param user:
+        User which is the current account.
 
     :param email_form:
         Form that will be used to change the email address. Defaults to
@@ -365,8 +363,6 @@ def email_change(request, username, email_form=ChangeEmailForm,
     permissions to alter the email address of others.
 
     """
-    user = get_object_or_404(User, username__iexact=username)
-
     form = email_form(user)
 
     if request.method == 'POST':
@@ -379,7 +375,7 @@ def email_change(request, username, email_form=ChangeEmailForm,
 
             if success_url: redirect_to = success_url
             else: redirect_to = reverse('userena_email_change_complete',
-                                        kwargs={'userid': get_userid(user)})
+                                        kwargs={get_url_userid_key() : get_url_userid(user)})
             return redirect(redirect_to)
 
     if not extra_context: extra_context = dict()
@@ -389,10 +385,10 @@ def email_change(request, username, email_form=ChangeEmailForm,
                               template_name,
                               extra_context=extra_context)
 
-@convert_userid_username
+@convert_userid_user_or_404
 @secure_required
-@permission_required_or_403('change_user', (User, 'username', 'username'))
-def password_change(request, username, template_name='userena/password_form.html',
+@permission_required_or_403('change_user')
+def password_change(request, user, template_name='userena/password_form.html',
                     pass_form=PasswordChangeForm, success_url=None, extra_context=None):
     """ Change password of user.
 
@@ -403,9 +399,8 @@ def password_change(request, username, template_name='userena/password_form.html
     that in a later stadium administrators can also change the users password
     through the web application itself.
 
-    :param username:
-        String supplying the username of the user who's password is about to be
-        changed.
+    :param user:
+        The user whose password is about to be changed.
 
     :param template_name:
         String of the name of the template that is used to display the password
@@ -430,9 +425,6 @@ def password_change(request, username, template_name='userena/password_form.html
         Form used to change the password.
 
     """
-    user = get_object_or_404(User,
-                             username__iexact=username)
-
     form = pass_form(user=user)
 
     if request.method == "POST":
@@ -446,7 +438,7 @@ def password_change(request, username, template_name='userena/password_form.html
 
             if success_url: redirect_to = success_url
             else: redirect_to = reverse('userena_password_change_complete',
-                                        kwargs={'userid': get_userid(user)})
+                                        kwargs={get_url_userid_key() : get_url_userid(user)})
             return redirect(redirect_to)
 
     if not extra_context: extra_context = dict()
@@ -456,10 +448,10 @@ def password_change(request, username, template_name='userena/password_form.html
                               template_name,
                               extra_context=extra_context)
 
-@convert_userid_username
+@convert_userid_user_or_404
 @secure_required
-@permission_required_or_403('change_profile', (get_profile_model(), 'user__username', 'username'))
-def profile_edit(request, username, edit_profile_form=EditProfileForm,
+@permission_required_or_403('change_profile')
+def profile_edit(request, user, edit_profile_form=EditProfileForm,
                  template_name='userena/profile_form.html', success_url=None,
                  extra_context=None, **kwargs):
     """
@@ -470,8 +462,8 @@ def profile_edit(request, username, edit_profile_form=EditProfileForm,
     show a 404. When the profile is succesfully edited will redirect to
     ``success_url``.
 
-    :param username:
-        Username of the user which profile should be edited.
+    :param user:
+        The user whose profile should be edited.
 
     :param edit_profile_form:
 
@@ -503,9 +495,6 @@ def profile_edit(request, username, edit_profile_form=EditProfileForm,
         Instance of the ``Profile`` that is edited.
 
     """
-    user = get_object_or_404(User,
-                             username__iexact=username)
-
     profile = user.get_profile()
 
     user_initial = {'first_name': user.first_name,
@@ -525,7 +514,7 @@ def profile_edit(request, username, edit_profile_form=EditProfileForm,
                                  fail_silently=True)
 
             if success_url: redirect_to = success_url
-            else: redirect_to = reverse('userena_profile_detail', kwargs={'userid': get_userid(user)})
+            else: redirect_to = reverse('userena_profile_detail', kwargs={get_url_userid_key() : get_url_userid(user)})
             return redirect(redirect_to)
 
     if not extra_context: extra_context = dict()
@@ -536,16 +525,16 @@ def profile_edit(request, username, edit_profile_form=EditProfileForm,
                               extra_context=extra_context,
                               **kwargs)
 
-@convert_userid_username
+@convert_userid_user_or_404
 def profile_detail(
-    request, username,
+    request, user,
     template_name=userena_settings.USERENA_PROFILE_DETAIL_TEMPLATE,
     extra_context=None, **kwargs):
     """
     Detailed view of an user.
 
-    :param username:
-        String of the username of which the profile should be viewed.
+    :param user:
+        The user whose profile should be viewed.
 
     :param template_name:
         String representing the template name that should be used to display
@@ -561,8 +550,6 @@ def profile_detail(
         Instance of the currently viewed ``Profile``.
 
     """
-    user = get_object_or_404(User,
-                             username__iexact=username)
     profile = user.get_profile()
     if not profile.can_view_profile(request.user):
         return HttpResponseForbidden(_("You don't have permission to view this profile."))

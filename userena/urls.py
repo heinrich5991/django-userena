@@ -7,7 +7,7 @@ from userena import views as userena_views
 from userena import settings as userena_settings
 
 if userena_settings.USERENA_URL_USE_USERNAME:
-    userid_pattern = r'(?P<userid>(?!signout|signup|signin)[\.\w]+)'
+    userid_pattern = r'(?P<username>(?!signout|signup|signin)[\.\w]+)'
 else:
     userid_pattern = r'(?P<userid>[1-9][0-9]*)'
 
